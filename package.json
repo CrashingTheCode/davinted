@@ -1,0 +1,20 @@
+{
+  "name": "product-upload",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "csv": "^6.2.5",
+    "i": "^0.3.7",
+    "npm": "^9.2.0",
+    "puppeteer": "^19.4.1",
+    "puppeteer-autoscroll-down": "^1.1.1",
+    "sequelize": "^6.28.0",
+    "sqlite3": "^5.1.4"
+  }
+}
