@@ -4,13 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node uploadDatas.js",
+    "create": "node createTables.js",
+    "add": "node addDataToTables.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "csv": "^6.2.5",
     "i": "^0.3.7",
+    "lodash": "^4.17.21",
     "npm": "^9.2.0",
     "puppeteer": "^19.4.1",
     "puppeteer-autoscroll-down": "^1.1.1",

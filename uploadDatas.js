@@ -2,10 +2,14 @@ const fs = require('fs');
 const {sequelize, Product, Iteration} = require('./models/products.model');
 const puppeteer = require('puppeteer');
 const {scrollPageToBottom} = require('puppeteer-autoscroll-down');
+const {getSizeEquivalents} = require('./utils/sizes/index');
+const upperFirst = require('lodash/upperFirst');
+const {checkAndClosePopups} = require('./helpers/popups');
 
 var initial; // starting sequece if products upload get struct inbetween need to update this field,
 const populateInitial = async () => {
-  initial = (await Iteration.findOne()).current;
+  initialData = await Iteration.findOne();
+  initial = 0;
   console.log('initial', initial);
 };
 populateInitial();
@@ -33,23 +37,20 @@ var addBrandSelector = '#custom-select-brand';
 var sizeSelector = '#size_id';
 
 var sizesChoice =
+  '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[5]/div[1]/div[1]/div/div/div/ul/li/div';
+const sizesChoice2nd =
   '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[5]/div[1]/div[1]/div/div/div/ul[2]/li/div';
-//    /html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[5]/div[1]/div[1]/div/div/div/ul/li[1]/div
-var otherSize = '#size-97';
-var conditionSelector = '#status_id';
-var conditionChoices =
-  '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[7]/div/div[1]/div/div/div/ul/li/div';
-var colorSelector = '#color';
 
-var colorChoices =
-  '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[9]/div/div[1]/div/div/div/ul[2]/li/div';
-('/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[10]/div/div[1]/div/div/div/ul[2]/li[1]/div');
-// #ItemUpload - react - component - b8c5cc2d - e3b4 - 43fc - 839e-215c88e4f77f > div: nth - child(8) > label
-var suggestedColor = '#suggested-color-24 > div.web_ui__Cell__content > div';
+var sizeMSelector = '#size-208';
+var conditionSelector = '#status_id';
+const status1Selector = '#status-6';
+const status2Selector = '#status-1';
+const status3Selector = '#status-2';
+var colorSelector = '#color';
 
 var priceSelector = '#price';
 
-var submitButton = '/html/body/main/div/section/div/div[2]/section/div/div/div[15]/div/button[2]';
+const submitButtonSelector = '[data-testid="upload-form-save-button"]';
 
 const loadCookie = async page => {
   const cookieJson = await fs.readFile('./www.vinted.es.cookies.json', async (err, data) => {
@@ -106,24 +107,26 @@ const dataUpload = async () => {
         await page.waitForSelector(imageUrls[j], {timeout: 60000});
         await page.click(imageUrls[j]);
         const elementHandle = await page.$('input[type="file"]');
-        await elementHandle.uploadFile(`./productsManual/${sku[1]}/${parseInt(sku[2])}.${j + 1}.jpg`);
-        console.log(`upload finished`);
+        await elementHandle.uploadFile(`./vintedFotos/${sku[1]}/${parseInt(sku[2])}.${j + 1}.jpg`);
+        console.log(`IMAGE upload finished ${j + 1}`);
       }
-
+      await sleep(2000);
       //title data input
       await page.waitForSelector(title);
 
       await page.focus(title);
-      await page.keyboard.type(data[i].dataValues.Nombre);
+      const formattedTitle = upperFirst(data[i].dataValues.Nombre.toLowerCase());
+      await page.keyboard.type(formattedTitle);
 
       await page.focus(description);
       await page.keyboard.type(
         `${data[i].dataValues.Talla || ''} ${data[i].dataValues.Marca || ''} ${data[i].dataValues.Descripción || ''}`,
       );
-      // category selector
+      //** */ category selector
       await page.waitForSelector(categorySelector);
       await page.click(categorySelector);
       const catElements = await page.$x(firstCategorySuggestion);
+      console.log('catElements', catElements.length);
       // colorElements[0].scrollIntoView({ behavior: 'smooth', block: 'center' })
       try {
         await catElements[0].click();
@@ -131,19 +134,23 @@ const dataUpload = async () => {
         console.log(err);
       }
 
-      //brand
+      await sleep(2000);
+
+      //** brand
+      const brandSuggestionsSelector = 'li.pile__element';
       let isBrandAdded = false;
       await page.waitForSelector(brand);
       await page.click(brand);
       await page.keyboard.type(data[i].dataValues.Marca);
-      await page.waitForXPath(firstBrandSuggestion);
-      const brandElements = await page.$x(firstBrandSuggestion);
+      await sleep(12000);
+      // await page.waitForXPath(firstBrandSuggestion);
+      const brandElements = await page.$$(brandSuggestionsSelector);
       console.log('brandElements', brandElements.length);
       let b = 0;
+      console.log('brand value', data[i].dataValues.Marca);
       while (brandElements[b] != undefined) {
         let value = await brandElements[b].evaluate(el => el.textContent);
         let brandReg = new RegExp(data[i].dataValues.Marca, 'ig');
-        console.log('brand value', data[i].dataValues.Marca);
         if (brandReg.test(value)) {
           await brandElements[b].click();
           isBrandAdded = true;
@@ -154,138 +161,222 @@ const dataUpload = async () => {
       if (!isBrandAdded) {
         page.click(addBrandSelector);
       }
-      //  size logic
+      await sleep(2000);
+      await checkAndClosePopups(page);
+
+      //**  SIZE LOGIC
+
       let isSizeSelected = false;
-      await page.waitForSelector(sizeSelector);
-      await page.click(sizeSelector);
+      const sizeInputElement = await page.$(sizeSelector);
+      //** Only when size input is there (not in accesories) */
+      if (sizeInputElement) {
+        await page.waitForSelector(sizeSelector);
+        await page.click(sizeSelector);
+        await sleep(2000);
+        //developing
+        // const sizeChoicesSelector = 'li.pile__element';
+        // await page.waitForSelector(sizeChoicesSelector);
+        // await sleep(120000);
+        // const sizeChoices = await page.$$(sizeChoicesSelector);
 
-      try {
-        sizesChoice =
-          '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[5]/div[1]/div[1]/div/div/div/ul[2]/li/div';
+        // console.log('sizeChoices', sizeChoices.length);
+        //** */
+
         await page.waitForXPath(sizesChoice);
-      } catch {
-        sizesChoice =
-          '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[5]/div[1]/div[1]/div/div/div/ul/li/div';
-      }
-      const sizeElements = await page.$x(sizesChoice);
-      console.log('sizeElements', sizeElements.length);
-      let c = 0;
-      while (sizeElements[c] != undefined) {
-        let value = await sizeElements[c].evaluate(el => el.textContent);
-        let brandReg = new RegExp('^' + data[i].dataValues.Talla, 'ig');
-        if (brandReg.test(value)) {
-          await sizeElements[c].click();
-          isSizeSelected = true;
-          break;
+        let sizeElements = await page.$x(sizesChoice);
+        if (sizeElements.length == 0) {
+          console.log('SIZE 2nd selector');
+          sizesChoice = sizesChoice2nd;
+          await page.waitForXPath(sizesChoice);
+          sizeElements = await page.$x(sizesChoice);
         }
-        c++;
-      }
+        console.log('sizeElements', sizeElements.length);
 
-      if (!isSizeSelected) {
-        c = 0;
+        let c = 0;
         while (sizeElements[c] != undefined) {
           let value = await sizeElements[c].evaluate(el => el.textContent);
-          let brandReg = new RegExp(data[i].dataValues.Talla.trim(), 'ig');
-
-          if (brandReg.test(value.trim())) {
+          console.log('size value', value);
+          let sizeReg = new RegExp('^' + data[i].dataValues.Talla, 'ig');
+          console.log('sizeReg', sizeReg);
+          if (sizeReg.test(value)) {
             await sizeElements[c].click();
             isSizeSelected = true;
-
             break;
           }
           c++;
         }
+
+        if (!isSizeSelected) {
+          c = 0;
+          while (sizeElements[c] != undefined) {
+            let value = await sizeElements[c].evaluate(el => el.textContent);
+            console.log('sizeValue 2nd TRY', value);
+            let sizeReg = new RegExp(data[i].dataValues.Talla.trim(), 'ig');
+            console.log('sizeReg 2nd TRY', sizeReg);
+            if (sizeReg.test(value.trim())) {
+              await sizeElements[c].click();
+              isSizeSelected = true;
+
+              break;
+            }
+            c++;
+          }
+        }
+        if (!isSizeSelected) {
+          //IF SIZE NOT FOUND...
+          //and is "one size"
+          if (data[i].dataValues.Talla == 'Talla única') {
+            //THEN set the standard size "M"
+            console.log('M SIZE SELECTED');
+            await page.click(sizeMSelector);
+            isSizeSelected = true;
+          } else {
+            //Try equivalent sizes
+            const sizeEquivalents = getSizeEquivalents(data[i].dataValues.Talla);
+            console.log('sizeEquivalents', sizeEquivalents);
+            //letter equivalent
+            const equivalentSize = sizeEquivalents[0];
+            c = 0;
+            while (sizeElements[c] != undefined) {
+              let value = await sizeElements[c].evaluate(el => el.textContent);
+              console.log('sizeValue EQUIVALENT TRY', value);
+              let sizeReg = new RegExp(equivalentSize, 'ig');
+              console.log('sizeReg EQUIVALENT TRY', sizeReg);
+              if (sizeReg.test(value.trim())) {
+                await sizeElements[c].click();
+                isSizeSelected = true;
+
+                break;
+              }
+              c++;
+            }
+          }
+          if (!isSizeSelected) {
+            console.error('SIZE ERROR, NOT FOUND');
+          }
+        }
       }
-      if (!isSizeSelected) {
-        await page.click(otherSize);
-      }
-      let tabc = await page.$x('//*[contains(text(), "Medidas")]');
-      console.log(tabc.length, 'error didnt thrown');
-      if (tabc.length > 1) {
-        conditionChoices =
-          '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[8]/div/div[1]/div/div/div/ul/li[3]/div';
-        colorChoices =
-          '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[10]/div/div[1]/div/div/div/ul[2]/li/div';
-        submitButton = '/html/body/main/div/section/div/div[2]/section/div/div/div[15]/div/button[2]';
-      } else {
-        console.log('error block');
-        conditionChoices =
-          '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[7]/div/div[1]/div/div/div/ul/li/div';
-        colorChoices =
-          '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[9]/div/div[1]/div/div/div/ul[2]/li/div';
-        submitButton = '/html/body/main/div/section/div/div[2]/section/div/div/div[15]/div/button[2]';
-      }
-      //  condition logic,
+
+      await sleep(2000);
+
+      //**  CONDITION LOGIC
+
+      await page.waitForSelector(conditionSelector);
+      await page.click(conditionSelector);
+
+      // const conditionElements = await page.$x(conditionChoices);
+      // try {
+      //   await conditionElements[2].click();
+      // } catch (error) {
+      //   console.log('condition selector error', error.message);
+      //   try {
+      //     await conditionElements[1].click();
+      //   } catch (error) {
+      //     console.log('condition selector error 2', error.message);
+      //     await conditionElements[0].click();
+      //   }
+      // }
+
+      await page.waitForSelector(status3Selector);
       try {
-        await page.waitForSelector(conditionSelector);
-        await page.click(conditionSelector);
-        const conditionElements = await page.$x(conditionChoices);
-        await conditionElements[0].click();
-      } catch {}
+        await page.click(status3Selector);
+      } catch (error) {
+        console.log('status selector error', error.message);
+        await page.waitForSelector(status2Selector);
+        try {
+          await page.click(status2Selector);
+        } catch (error) {
+          console.log('status selector error 2', error.message);
+          await page.waitForSelector(status1Selector);
+          await page.click(status1Selector);
+        }
+      }
 
-      console.log('run 2');
-      await page.waitForSelector('#package-size-1');
-      await page.click('#package-size-3');
+      await sleep(2000);
 
-      /**
-       * price logic
-       */
+      //**  PACKAGE LOGIC
+      await page.waitForSelector('#package-size-2');
+      await page.click('#package-size-2');
 
+      await sleep(2000);
+
+      //**  PRICE LOGIC
       await page.focus(priceSelector);
-
       await page.keyboard.type(data[i].dataValues.Precio_Final);
 
-      // color logic-------------------------------------------------
+      await sleep(2000);
 
+      const colorChoicesSelector = 'li.pile__element';
+      //**  COLOR LOGIC
       await page.click(colorSelector, {delay: 500});
-      const colorElements = await page.$x(colorChoices);
-      console.log('colorElements', colorElements);
+      await sleep(2000);
+
+      // const colorElements = await page.$x(colorChoices);
+      const colorElements = await page.$$(colorChoicesSelector);
+
       let d = 0;
-      noofSelectedColor = 0;
+      let mainColor = '';
+      let secondaryColor = '';
       let colorReg = new RegExp(data[i].dataValues.Color, 'ig');
       let optionalColorReg;
       if (data[i].dataValues.Color_optional) {
         optionalColorReg = new RegExp(data[i].dataValues.Color_optional, 'ig');
       }
+      console.log('DATA COLORS regs', colorReg, optionalColorReg);
       while (colorElements[d] != undefined) {
         let value = await colorElements[d].evaluate(el => el.textContent);
 
-        console.log(colorReg, value);
-        if (colorReg.test(value)) {
-          await Promise.all([
-            await colorElements[d].click({
-              delay: 1000,
-            }),
-          ]).catch(e => console.log(e));
+        if (colorReg.test(value) && !mainColor) {
+          console.log(colorReg, value);
+          await colorElements[d].click({
+            delay: 1000,
+          });
+          mainColor = value;
+
           if (!optionalColorReg) {
             break;
-          } else {
-            noofSelectedColor++;
           }
         }
         if (optionalColorReg) {
-          if (optionalColorReg.test(value)) {
+          if (optionalColorReg.test(value) && !secondaryColor) {
             await colorElements[d].click({
               delay: 1000,
             });
-            noofSelectedColor++;
+            secondaryColor = value;
           }
         }
-        if (noofSelectedColor == 2) {
+        if (mainColor && secondaryColor) {
           break;
         }
         d++;
       }
+      if (!mainColor) {
+        await sleep(2000);
+        await colorElements[0].click({
+          delay: 1000,
+        });
+        console.log('COLOR NOT FOUND');
+      }
 
-      await page.waitForXPath(submitButton);
-      const submitElements = await page.$x(submitButton);
-      await submitElements[0].click({delay: 4000});
-      // await sleep(5000)
-      console.log(`------------------${data[i].dataValues.SKU} product uploaded successfully------------`);
+      //**  SUBMIT LOGIC
+      await page.waitForSelector(submitButtonSelector);
+      await page.click(submitButtonSelector, {delay: 4000});
+
       try {
-        await page.waitForNavigation({timeout: 6000});
-      } catch (err) {}
-      await Iteration.update({current: i}, {where: {id: 1}});
+        await page.waitForNavigation({timeout: 20000});
+        console.log(`------------------${data[i].dataValues.SKU} product upload finished------------`);
+      } catch (err) {
+        console.error('NAVIGATION ERROR', err.message);
+        await page.waitForSelector(submitButtonSelector);
+        await page.click(submitButtonSelector, {delay: 4000});
+        try {
+          await page.waitForNavigation({timeout: 20000});
+          console.log(`------------------${data[i].dataValues.SKU} product upload finished------------`);
+        } catch (error) {
+          console.error('NAVIGATION ERROR 2', error.message);
+        }
+      }
+      // await Iteration.update({current: i + 1}, {where: {id: 1}});
     }
   }
 };
