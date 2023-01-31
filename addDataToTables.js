@@ -1,10 +1,8 @@
-const csv = require("csv");
-const fs = require("fs");
-const { parse } = require("csv-parse");
+const csv = require('csv');
+const fs = require('fs');
+const {parse} = require('csv-parse');
 
-const { sequelize, User,Product ,Iteration} = require("./models/products.model")
-
-
+const {sequelize, User, Product, Iteration} = require('./models/products.model');
 
 // sequelize
 //   .authenticate()
@@ -12,26 +10,26 @@ const { sequelize, User,Product ,Iteration} = require("./models/products.model")
 //   .catch(err => console.error('Unable to connect to the database:', err));
 
 // or whatever you want for initial iteration
-Iteration.create({current:0})
+Iteration.create({current: 0});
 
-var DataArray = []
+var DataArray = [];
 
-fs.createReadStream("./csv productsManual.csv")
-  .pipe(parse({ delimiter: ",", from_line: 2 }))
-  .on("data", async(row) =>{
+fs.createReadStream('./vintedProducts.csv')
+  .pipe(parse({delimiter: ',', from_line: 2}))
+  .on('data', async row => {
     console.log(row[0]);
     // await extraxtFolderNameAndFileName(row)
     let brand = row[6];
     // console.log(brand,'Pull&Bear',brand=='Pull&Bear')
-    if(brand=='Pull&Bear'){
+    if (brand == 'Pull&Bear') {
       // console.log('true')
-      brand = 'Pull & Bear'
+      brand = 'Pull & Bear';
     }
-    let size = row[7]
-    if(size=='One size' || size==' One size'){
-      size = 'Talla única'
+    let size = row[7];
+    if (size == 'One size' || size == ' One size') {
+      size = 'Talla única';
     }
-    
+
     Product.create({
       Vendedor: row[0],
       SKU: row[1],
@@ -54,22 +52,16 @@ fs.createReadStream("./csv productsManual.csv")
       Fecha: row[18],
       Descripción: row[19],
       Fecha: row[20],
+    });
+  });
 
-    })
-  })
-
-
-const extraxtFolderNameAndFileName = async (prodDetails) =>{
-  let sku = prodDetails[1]
-  console.log(sku)
-
-}
-
-
-
+const extraxtFolderNameAndFileName = async prodDetails => {
+  let sku = prodDetails[1];
+  console.log(sku);
+};
 
 // const dataExtract = async () =>{
-//   let data1 = fs.readFileSync("./csv productsManual.csv",(err,data)=>{
+//   let data1 = fs.readFileSync("./vintedProducts.csv",(err,data)=>{
 //     console.log(data,err)
 
 //   })
