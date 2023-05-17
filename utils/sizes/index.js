@@ -1,6 +1,6 @@
 const getSizeEquivalents = value => {
-  if (value == 30 || value == 'XXS') {
-    return ['XXS', 30];
+  if (value == 30 || value == 'XS') {
+    return ['XS', 30];
   } else if (value == 32 || value == 'XS') {
     return ['XS', 32];
   } else if (value == 34 || value == 'S') {
@@ -9,8 +9,12 @@ const getSizeEquivalents = value => {
     return ['M', 36];
   } else if (value == 38 || value == 'L') {
     return ['L', 38];
+  } else if (value == 39 || value == 'L') {
+    return ['L', 39];
   } else if (value == 40 || value == 'XL') {
     return ['XL', 40];
+  } else if (value == 41 || value == 'XL') {
+    return ['XL', 41];
   } else if (value == 42 || value == 'XXL') {
     return ['XXL', 42];
   } else if (value == 44 || value == 'XXXL') {

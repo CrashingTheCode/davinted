@@ -9,7 +9,7 @@ const {checkAndClosePopups} = require('./helpers/popups');
 var initial; // starting sequece if products upload get struct inbetween need to update this field,
 const populateInitial = async () => {
   initialData = await Iteration.findOne();
-  initial = 0;
+  initial = 78;
   console.log('initial', initial);
 };
 populateInitial();
@@ -36,10 +36,12 @@ var firstBrandSuggestion =
 var addBrandSelector = '#custom-select-brand';
 var sizeSelector = '#size_id';
 
-var sizesChoice =
+const sizesChoice =
   '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[5]/div[1]/div[1]/div/div/div/ul/li/div';
 const sizesChoice2nd =
   '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[5]/div[1]/div[1]/div/div/div/ul[2]/li/div';
+const sizesChoice3rd =
+  '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[6]/div[1]/div[1]/div/div/div/ul/li/div';
 
 var sizeMSelector = '#size-208';
 var conditionSelector = '#status_id';
@@ -102,27 +104,30 @@ const dataUpload = async () => {
     }
     if (data[i].dataValues.SKU.length > 0) {
       let sku = data[i].dataValues.SKU.split('.');
-      // image upload
+      //**  IMAGE upload
       for (j = 0; j < data[i].dataValues.noof_Fotos; j++) {
         await page.waitForSelector(imageUrls[j], {timeout: 60000});
         await page.click(imageUrls[j]);
         const elementHandle = await page.$('input[type="file"]');
+        console.log('Photo uploading...', `./vintedFotos/${sku[1]}/${parseInt(sku[2])}.${j + 1}.jpg`);
         await elementHandle.uploadFile(`./vintedFotos/${sku[1]}/${parseInt(sku[2])}.${j + 1}.jpg`);
         console.log(`IMAGE upload finished ${j + 1}`);
       }
-      await sleep(2000);
-      //title data input
+      await sleep(1000);
+      //** Title
       await page.waitForSelector(title);
 
       await page.focus(title);
       const formattedTitle = upperFirst(data[i].dataValues.Nombre.toLowerCase());
       await page.keyboard.type(formattedTitle);
 
+      //** Title
       await page.focus(description);
       await page.keyboard.type(
         `${data[i].dataValues.Talla || ''} ${data[i].dataValues.Marca || ''} ${data[i].dataValues.Descripción || ''}`,
       );
-      //** */ category selector
+      //** Category
+      await sleep(1000);
       await page.waitForSelector(categorySelector);
       await page.click(categorySelector);
       const catElements = await page.$x(firstCategorySuggestion);
@@ -130,19 +135,20 @@ const dataUpload = async () => {
       // colorElements[0].scrollIntoView({ behavior: 'smooth', block: 'center' })
       try {
         await catElements[0].click();
+        console.log('Category Clicked');
       } catch (err) {
-        console.log(err);
+        console.log('Category Error', err);
       }
 
-      await sleep(2000);
+      await sleep(1000);
 
-      //** brand
+      //** Brand
       const brandSuggestionsSelector = 'li.pile__element';
       let isBrandAdded = false;
       await page.waitForSelector(brand);
       await page.click(brand);
       await page.keyboard.type(data[i].dataValues.Marca);
-      await sleep(12000);
+      await sleep(1000);
       // await page.waitForXPath(firstBrandSuggestion);
       const brandElements = await page.$$(brandSuggestionsSelector);
       console.log('brandElements', brandElements.length);
@@ -159,9 +165,10 @@ const dataUpload = async () => {
         b++;
       }
       if (!isBrandAdded) {
+        await page.waitForSelector(addBrandSelector);
         page.click(addBrandSelector);
       }
-      await sleep(2000);
+      await sleep(1000);
       await checkAndClosePopups(page);
 
       //**  SIZE LOGIC
@@ -172,7 +179,7 @@ const dataUpload = async () => {
       if (sizeInputElement) {
         await page.waitForSelector(sizeSelector);
         await page.click(sizeSelector);
-        await sleep(2000);
+        await sleep(1000);
         //developing
         // const sizeChoicesSelector = 'li.pile__element';
         // await page.waitForSelector(sizeChoicesSelector);
@@ -182,13 +189,26 @@ const dataUpload = async () => {
         // console.log('sizeChoices', sizeChoices.length);
         //** */
 
-        await page.waitForXPath(sizesChoice);
-        let sizeElements = await page.$x(sizesChoice);
+        let choiceNumber = 1;
+        let currentSizesChoice = sizesChoice;
+        try {
+          await page.waitForXPath(currentSizesChoice);
+        } catch (error) {
+          console.log('error waiting sizesChoice lets try 3rd', error);
+          choiceNumber = 3;
+        }
+
+        if (choiceNumber == 3) {
+          currentSizesChoice = sizesChoice3rd;
+          await page.waitForXPath(currentSizesChoice);
+        }
+
+        let sizeElements = await page.$x(currentSizesChoice);
         if (sizeElements.length == 0) {
           console.log('SIZE 2nd selector');
-          sizesChoice = sizesChoice2nd;
-          await page.waitForXPath(sizesChoice);
-          sizeElements = await page.$x(sizesChoice);
+          currentSizesChoice = sizesChoice2nd;
+          await page.waitForXPath(currentSizesChoice);
+          sizeElements = await page.$x(currentSizesChoice);
         }
         console.log('sizeElements', sizeElements.length);
 
@@ -257,25 +277,76 @@ const dataUpload = async () => {
         }
       }
 
-      await sleep(2000);
+      await sleep(1000);
+
+      //**  PRICE LOGIC
+      console.log('Pricing...');
+      await page.focus(priceSelector);
+      await page.keyboard.type(data[i].dataValues.Precio_Final);
+
+      await sleep(1000);
+
+      const colorChoicesSelector = 'li.pile__element';
+      //**  COLOR LOGIC
+      await page.click(colorSelector, {delay: 500});
+      await sleep(1000);
+
+      // const colorElements = await page.$x(colorChoices);
+      const colorElements = await page.$$(colorChoicesSelector);
+
+      let d = 0;
+      let mainColor = '';
+      let secondaryColor = '';
+      let colorReg = new RegExp(data[i].dataValues.Color, 'ig');
+      let optionalColorReg;
+      if (data[i].dataValues.Color_optional) {
+        optionalColorReg = new RegExp(data[i].dataValues.Color_optional, 'ig');
+      }
+      console.log('DATA COLORS regs', colorReg, optionalColorReg);
+      while (colorElements[d] != undefined) {
+        let value = await colorElements[d].evaluate(el => el.textContent);
+        console.log('color value', value);
+        if (colorReg.test(value) && !mainColor) {
+          console.log(colorReg, value);
+          await colorElements[d].click({
+            delay: 1000,
+          });
+          console.log('colorClicked main');
+          mainColor = value;
+
+          if (!optionalColorReg) {
+            break;
+          }
+        }
+        if (optionalColorReg) {
+          if (optionalColorReg.test(value) && !secondaryColor) {
+            await colorElements[d].click({
+              delay: 1000,
+            });
+            console.log('colorClicked second');
+            secondaryColor = value;
+            break;
+          }
+        }
+        if (mainColor && secondaryColor) {
+          break;
+        }
+        d++;
+      }
+      if (!mainColor && !secondaryColor) {
+        console.log('COLOR NOT FOUND');
+        await sleep(1000);
+        await colorElements[0].click({
+          delay: 1000,
+        });
+      }
+
+      await sleep(1000);
 
       //**  CONDITION LOGIC
-
+      console.log('Condition...');
       await page.waitForSelector(conditionSelector);
       await page.click(conditionSelector);
-
-      // const conditionElements = await page.$x(conditionChoices);
-      // try {
-      //   await conditionElements[2].click();
-      // } catch (error) {
-      //   console.log('condition selector error', error.message);
-      //   try {
-      //     await conditionElements[1].click();
-      //   } catch (error) {
-      //     console.log('condition selector error 2', error.message);
-      //     await conditionElements[0].click();
-      //   }
-      // }
 
       await page.waitForSelector(status3Selector);
       try {
@@ -292,85 +363,32 @@ const dataUpload = async () => {
         }
       }
 
-      await sleep(2000);
+      await sleep(1000);
 
       //**  PACKAGE LOGIC
+      console.log('Package...');
+
       await page.waitForSelector('#package-size-2');
-      await page.click('#package-size-2');
+      const packageElement = await page.$('#package-size-2');
+      await packageElement.click();
 
-      await sleep(2000);
-
-      //**  PRICE LOGIC
-      await page.focus(priceSelector);
-      await page.keyboard.type(data[i].dataValues.Precio_Final);
-
-      await sleep(2000);
-
-      const colorChoicesSelector = 'li.pile__element';
-      //**  COLOR LOGIC
-      await page.click(colorSelector, {delay: 500});
-      await sleep(2000);
-
-      // const colorElements = await page.$x(colorChoices);
-      const colorElements = await page.$$(colorChoicesSelector);
-
-      let d = 0;
-      let mainColor = '';
-      let secondaryColor = '';
-      let colorReg = new RegExp(data[i].dataValues.Color, 'ig');
-      let optionalColorReg;
-      if (data[i].dataValues.Color_optional) {
-        optionalColorReg = new RegExp(data[i].dataValues.Color_optional, 'ig');
-      }
-      console.log('DATA COLORS regs', colorReg, optionalColorReg);
-      while (colorElements[d] != undefined) {
-        let value = await colorElements[d].evaluate(el => el.textContent);
-
-        if (colorReg.test(value) && !mainColor) {
-          console.log(colorReg, value);
-          await colorElements[d].click({
-            delay: 1000,
-          });
-          mainColor = value;
-
-          if (!optionalColorReg) {
-            break;
-          }
-        }
-        if (optionalColorReg) {
-          if (optionalColorReg.test(value) && !secondaryColor) {
-            await colorElements[d].click({
-              delay: 1000,
-            });
-            secondaryColor = value;
-          }
-        }
-        if (mainColor && secondaryColor) {
-          break;
-        }
-        d++;
-      }
-      if (!mainColor) {
-        await sleep(2000);
-        await colorElements[0].click({
-          delay: 1000,
-        });
-        console.log('COLOR NOT FOUND');
-      }
+      await sleep(1000);
 
       //**  SUBMIT LOGIC
+      console.log('Submiting...');
       await page.waitForSelector(submitButtonSelector);
       await page.click(submitButtonSelector, {delay: 4000});
 
       try {
-        await page.waitForNavigation({timeout: 20000});
+        await page.waitForNavigation({timeout: 30000});
         console.log(`------------------${data[i].dataValues.SKU} product upload finished------------`);
       } catch (err) {
         console.error('NAVIGATION ERROR', err.message);
+        console.log('Submiting 2...');
         await page.waitForSelector(submitButtonSelector);
         await page.click(submitButtonSelector, {delay: 4000});
         try {
-          await page.waitForNavigation({timeout: 20000});
+          await page.waitForNavigation({timeout: 30000});
           console.log(`------------------${data[i].dataValues.SKU} product upload finished------------`);
         } catch (error) {
           console.error('NAVIGATION ERROR 2', error.message);

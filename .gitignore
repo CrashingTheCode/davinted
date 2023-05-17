@@ -1,6 +1,13 @@
 ./vintedFotos
 ./vintedProducts.csv
 ./database.sqlite
-/vintedFotos
-/vintedProducts.csv
-/database.sqlite
+vintedFotos/
+vintedProducts.csv
+database.sqlite
+www.vinted.es.cookies.json
+
+# node.js
+#
+node_modules/
+npm-debug.log
+yarn-error.log

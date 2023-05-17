@@ -112,7 +112,7 @@ Product.sync()
 const Iteration = sequelize.define('iteration', {
   current: {
     type: Sequelize.NUMBER,
-    default: 1,
+    default: 0,
   },
 });
 
