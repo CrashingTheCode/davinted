@@ -1,7 +1,7 @@
 const fs = require('fs');
 const {sequelize, Product, Iteration} = require('./models/products.model');
 const puppeteer = require('puppeteer');
-const {scrollPageToBottom} = require('puppeteer-autoscroll-down');
+
 const {getSizeEquivalents} = require('./utils/sizes/index');
 const upperFirst = require('lodash/upperFirst');
 const {checkAndClosePopups} = require('./helpers/popups');
@@ -9,18 +9,15 @@ const {checkAndClosePopups} = require('./helpers/popups');
 var initial; // starting sequece if products upload get struct inbetween need to update this field,
 const populateInitial = async () => {
   initialData = await Iteration.findOne();
-  initial = 78;
+  initial = 0;
   console.log('initial', initial);
 };
 populateInitial();
 
-var addImage =
+var firstImageSelector =
   '#photos > div.web_ui__Cell__cell.web_ui__Cell__wide > div > div > div > div.media-select__input > div > button';
-var secondImageSelector =
-  '#photos > div.web_ui__Cell__cell.web_ui__Cell__wide > div > div > div > div.media-select__grid > div.media-select__input-box > div > button';
-var thirdImageSelector =
-  '#photos > div.web_ui__Cell__cell.web_ui__Cell__wide > div > div > div.dropzone > div.media-select__grid > div.media-select__input-box > div > button';
-var imageUrls = [addImage, secondImageSelector, thirdImageSelector];
+
+const nonFirstImageSelector = "div.media-select__input-box-content > button[type='button']";
 
 var title = '#title';
 var description = '#description';
@@ -29,10 +26,7 @@ var categorySelector = '#catalog_id';
 var firstCategorySuggestion =
   '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[1]/div/div[1]/div/div/div/ul/li[2]/div';
 var brand = '#brand_id';
-var brandBtn =
-  '#ItemUpload-react-component-e77229db-4838-4c64-b45e-7b11460a94e5 > div:nth-child(8) > div:nth-child(3) > div > div > span > svg';
-var firstBrandSuggestion =
-  '/html/body/main/div/section/div/div[2]/section/div/div/div[7]/div[3]/div/div[1]/div/div/div/ul/li/div';
+
 var addBrandSelector = '#custom-select-brand';
 var sizeSelector = '#size_id';
 
@@ -106,8 +100,12 @@ const dataUpload = async () => {
       let sku = data[i].dataValues.SKU.split('.');
       //**  IMAGE upload
       for (j = 0; j < data[i].dataValues.noof_Fotos; j++) {
-        await page.waitForSelector(imageUrls[j], {timeout: 60000});
-        await page.click(imageUrls[j]);
+        let imageSelector = firstImageSelector;
+        if (j != 0) {
+          imageSelector = nonFirstImageSelector;
+        }
+        await page.waitForSelector(imageSelector, {timeout: 60000});
+        await page.click(imageSelector);
         const elementHandle = await page.$('input[type="file"]');
         console.log('Photo uploading...', `./vintedFotos/${sku[1]}/${parseInt(sku[2])}.${j + 1}.jpg`);
         await elementHandle.uploadFile(`./vintedFotos/${sku[1]}/${parseInt(sku[2])}.${j + 1}.jpg`);
@@ -149,7 +147,7 @@ const dataUpload = async () => {
       await page.click(brand);
       await page.keyboard.type(data[i].dataValues.Marca);
       await sleep(1000);
-      // await page.waitForXPath(firstBrandSuggestion);
+
       const brandElements = await page.$$(brandSuggestionsSelector);
       console.log('brandElements', brandElements.length);
       let b = 0;
